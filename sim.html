@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Симулятор Трейдера</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmY5OTMzIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZmYzZDAwIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSIxMDAiIGZpbGw9IiMwYTBhMGEiLz48dGV4dCB4PSIyNTYiIHk9IjM2MCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjI4MCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0idXJsKCNnKSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+JDwvdGV4dD48L3N2Zz4=">
+<style>
+:root {
+  --bg: #0a0a0a;
+  --panel: #141414;
+  --border: #2a2a2a;
+  --text: #e0e0e0;
+  --muted: #777;
+  --orange: #ff7b00;
+  --orange-hover: #ff9933;
+  --green: #00e676;
+  --red: #ff3d00;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Inter, sans-serif; }
+body { background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; user-select: none; }
+
+/* Экраны */
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; background: var(--bg); z-index: 10; }
+.screen.active { display: flex; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+button { cursor: pointer; border: none; border-radius: 8px; font-weight: 700; transition: 0.2s; outline: none; }
+button:active { transform: scale(0.96); }
+
+/* Меню (поднято вверх) */
+#menu { 
+  align-items: center; 
+  justify-content: center; 
+  padding-bottom: 10vh; 
+}
+#menu h1 { font-size: 52px; color: var(--orange); text-shadow: 0 0 25px rgba(255, 123, 0, 0.3); letter-spacing: 2px; margin-bottom: 10px; text-align: center; }
+#menu .subtitle { color: var(--muted); margin-bottom: 40px; font-size: 16px; letter-spacing: 1px; }
+.menu-btn { width: 320px; padding: 18px; margin: 8px; background: var(--panel); border: 1px solid var(--border); color: var(--text); font-size: 16px; letter-spacing: 0.5px; }
+.menu-btn:hover { border-color: var(--orange); color: var(--orange); box-shadow: 0 0 15px rgba(255, 123, 0, 0.15); }
+.menu-btn.primary { background: var(--orange); color: #000; border: none; }
+.menu-btn.primary:hover { background: var(--orange-hover); box-shadow: 0 0 25px rgba(255, 123, 0, 0.4); }
+.menu-btn.danger { background: transparent; border-color: var(--red); color: var(--red); margin-top: 20px; }
+.menu-btn.danger:hover { background: var(--red); color: #fff; box-shadow: 0 0 15px rgba(255,61,0,0.4); }
+.author { position: absolute; bottom: 30px; color: var(--muted); font-size: 13px; letter-spacing: 1.5px; }
+
+/* Игра */
+#game { display: none; height: 100%; }
+#game.active { display: flex; }
+.top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.asset-selector button { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 20px; margin-right: 8px; font-size: 14px; border-radius: 20px; }
+.asset-selector button.active { background: rgba(255,123,0,0.1); border-color: var(--orange); color: var(--orange); }
+.back-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 16px; font-size: 14px; }
+.back-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+/* Лента новостей */
+.news-ticker { background: #111; border-bottom: 1px solid var(--border); padding: 10px 20px; font-size: 14px; overflow: hidden; white-space: nowrap; position: relative; display: flex; }
+.news-ticker span { display: inline-block; color: var(--orange); font-weight: 600; animation: ticker 35s linear infinite; }
+@keyframes ticker { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
+
+/* График */
+.chart-area { flex: 1; position: relative; background: #050505; border-bottom: 1px solid var(--border); overflow: hidden; }
+canvas { width: 100%; height: 100%; display: block; }
+
+/* Панель торговли и портфеля (3 колонки) */
+.bottom-panel { display: flex; height: 200px; background: var(--panel); border-top: 1px solid var(--border); }
+.trade-panel { flex: 1.2; padding: 15px 20px; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
+.trade-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.trade-input { flex: 1; background: #000; border: 1px solid var(--border); color: var(--text); padding: 12px 15px; border-radius: 8px; font-size: 16px; outline: none; font-family: monospace; }
+.trade-input:focus { border-color: var(--orange); box-shadow: 0 0 10px rgba(255,123,0,0.1); }
+.trade-btn { flex: 1; padding: 12px; font-size: 15px; color: #000; text-transform: uppercase; letter-spacing: 1px; }
+.btn-buy { background: var(--green); }
+.btn-buy:hover { background: #33ff99; box-shadow: 0 0 15px rgba(0,230,118,0.3); }
+.btn-sell { background: var(--red); color: #fff; }
+.btn-sell:hover { background: #ff6644; box-shadow: 0 0 15px rgba(255,61,0,0.3); }
+.balance-info { margin-top: 5px; font-size: 20px; font-weight: 800; color: var(--orange); display: flex; justify-content: space-between; align-items: center; font-family: monospace; }
+.balance-info span { color: var(--text); }
+.free-money-btn { background: transparent; border: 1px solid var(--orange); color: var(--orange); padding: 8px 15px; font-size: 12px; border-radius: 6px; }
+.free-money-btn:hover { background: var(--orange); color: #000; }
+
+/* Правая колонка (разделена на две части) */
+.side-panel { 
+  width: 450px; 
+  display: flex; 
+  flex-direction: row; 
+  background: #0f0f0f; 
+  border-left: 1px solid var(--border); 
+}
+.assets-panel { 
+  width: 50%; 
+  padding: 15px; 
+  display: flex; 
+  flex-direction: column; 
+  background: #111; 
+  border-right: 1px solid var(--border); 
+}
+.history-panel { 
+  width: 50%; 
+  padding: 15px; 
+  display: flex; 
+  flex-direction: column; 
+}
+.panel-title { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; font-weight: 700; }
+.history-list, .assets-list { 
+  flex: 1; 
+  overflow-y: auto; 
+  font-size: 13px; 
+  scrollbar-width: none; /* Скрываем скроллбар для Firefox */
+}
+
+.history-list::-webkit-scrollbar, 
+.assets-list::-webkit-scrollbar { 
+  display: none; /* Скрываем скроллбар для Chrome, Safari и Edge */
+}
+.history-item, .asset-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-family: monospace; }
+.asset-item { color: var(--orange); font-weight: bold; }
+.hist-buy { color: var(--green); font-weight: bold; }
+.hist-sell { color: var(--red); font-weight: bold; }
+.hist-asset { color: var(--muted); font-weight: normal; margin-left: 5px; }
+
+/* Достижения */
+#achievements { padding: 30px 20px; align-items: center; overflow-y: auto; }
+#achievements h2 { color: var(--orange); margin-bottom: 25px; font-size: 28px; letter-spacing: 1px; }
+.ach-list { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 12px; }
+.ach-item { display: flex; justify-content: space-between; padding: 18px 25px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; font-size: 16px; transition: 0.3s; }
+.ach-item.unlocked { border-color: var(--orange); background: rgba(255,123,0,0.05); box-shadow: 0 0 15px rgba(255,123,0,0.1); }
+.ach-item.unlocked .ach-reward { color: var(--orange); font-weight: 900; font-family: monospace; }
+.ach-reward { color: var(--muted); font-weight: bold; font-family: monospace; }
+.ach-title { font-weight: 600; }
+
+@media (max-width: 850px) {
+  .bottom-panel { flex-direction: column; height: auto; }
+  .trade-panel { border-right: none; border-bottom: 1px solid var(--border); padding: 15px; }
+  .side-panel { width: 100%; border-left: none; height: 300px; }
+  .top-bar { flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .asset-selector { display: flex; justify-content: center; width: 100%; }
+  .back-btn { width: 100%; }
+  #menu h1 { font-size: 36px; }
+  #menu { padding-bottom: 5vh; }
+}
+</style>
+</head>
+<body>
+
+<!-- МЕНЮ -->
+<div id="menu" class="screen active">
+  <h1>СИМУЛЯТОР ТРЕЙДЕРА</h1>
+  <div class="subtitle">СТАНЬ ЛЕГЕНДОЙ УОЛЛ-СТРИТ</div>
+  <button class="menu-btn primary" onclick="startGame()">▶ Продолжить торговлю</button>
+  <button class="menu-btn" onclick="showAchievements()">🏆 Мои достижения</button>
+  <button class="menu-btn danger" onclick="resetProgress()">🗑 Сбросить прогресс</button>
+  <div class="author">made by kuvardin kirill</div>
+</div>
+
+<!-- ИГРА -->
+<div id="game" class="screen">
+  <div class="top-bar">
+    <div class="asset-selector" id="assetSelector">
+      <button class="active" onclick="selectAsset('BTC', this)">₿ Bitcoin</button>
+      <button onclick="selectAsset('AAPL', this)">🍎 Apple</button>
+      <button onclick="selectAsset('TSLA', this)">🚗 Tesla</button>
+    </div>
+    <button class="back-btn" onclick="goToMenu()">← Назад в меню</button>
+  </div>
+  
+  <div class="news-ticker">
+    <span id="newsText">Рынок открыт. Ожидаем новостей...</span>
+  </div>
+
+  <div class="chart-area">
+    <canvas id="chartCanvas"></canvas>
+  </div>
+
+  <div class="bottom-panel">
+    <!-- Левая колонка: Торговля -->
+    <div class="trade-panel">
+      <div class="trade-row">
+        <input type="number" id="tradeAmount" class="trade-input" placeholder="Количество..." min="0" step="0.01">
+      </div>
+      <div class="trade-row">
+        <button class="trade-btn btn-buy" onclick="trade('buy')">Купить</button>
+        <button class="trade-btn btn-sell" onclick="trade('sell')">Продать</button>
+      </div>
+      <div class="balance-info">
+        БАЛАНС: <span id="balanceDisplay">$10,000.00</span>
+        <button class="free-money-btn" onclick="getFreeMoney()">+$5K БОНУС</button>
+      </div>
+    </div>
+    
+    <!-- Правая зона: Активы (слева) + Сделки (справа) -->
+    <div class="side-panel">
+      <div class="assets-panel">
+        <div class="panel-title">Мои активы</div>
+        <div class="assets-list" id="assetsList"></div>
+      </div>
+      
+      <div class="history-panel">
+        <div class="panel-title">Последние сделки</div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ДОСТИЖЕНИЯ -->
+<div id="achievements" class="screen">
+  <h2>🏆 МОИ ДОСТИЖЕНИЯ</h2>
+  <div class="ach-list" id="achList"></div>
+  <button class="menu-btn" style="margin-top:30px; width:200px;" onclick="goToMenu()">← Назад</button>
+</div>
+
+<script>
+// ==========================================
+// АУДИО СИСТЕМА
+// ==========================================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = new AudioCtx();
+
+function playClick() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playCashSound() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(2000, audioCtx.currentTime + 0.1);
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.3);
+}
+
+// ==========================================
+// ДАННЫЕ И СОХРАНЕНИЕ
+// ==========================================
+let balance = 10000;
+let assets = {
+  BTC: { price: 60000, history: [], name: 'Bitcoin', vol: 0.015 },
+  AAPL: { price: 180, history: [], name: 'Apple', vol: 0.008 },
+  TSLA: { price: 250, history: [], name: 'Tesla', vol: 0.02 }
+};
+let currentAsset = 'BTC';
+let portfolio = { BTC: 0, AAPL: 0, TSLA: 0 };
+let tradeHistory = [];
+let tickCount = 0;
+
+const CANDLE_COUNT = 60;
+const TICK_INTERVAL = 800;
+let chartInterval = null;
+let newsInterval = null;
+
+const ACHIEVEMENTS = [
+  { target: 1000, title: "Первая тысяча" },
+  { target: 10000, title: "Уверенный старт" },
+  { target: 50000, title: "Опытный трейдер" },
+  { target: 100000, title: "Профи" },
+  { target: 500000, title: "Полмиллиона" },
+  { target: 1000000, title: "Миллионер" },
+  { target: 5000000, title: "Магнат" },
+  { target: 10000000, title: "10 Миллионов" },
+  { target: 25000000, title: "Легенда Уолл-Стрит" }
+];
+
+const NEWS_EVENTS = [
+  { text: "ФРС повышает ставку. Рынок в панике!", impact: -0.05, asset: 'all' },
+  { text: "ФРС снижает ставку. Деньги текут на биржу!", impact: 0.05, asset: 'all' },
+  { text: "Илон Маск запостил мем про Tesla. Акции летят в космос!", impact: 0.15, asset: 'TSLA' },
+  { text: "Крупный сбой в сети Bitcoin. Паника среди инвесторов.", impact: -0.1, asset: 'BTC' },
+  { text: "Apple презентовала iGlasses. Продажи бьют рекорды!", impact: 0.08, asset: 'AAPL' },
+  { text: "Хакеры украли $1 млрд в криптовалюте. BTC падает.", impact: -0.12, asset: 'BTC' },
+  { text: "Tesla отзывает все машины. Инвесторы разочарованы.", impact: -0.15, asset: 'TSLA' },
+  { text: "Apple покупает стартап по ИИ за $50 млрд. Рост акций.", impact: 0.1, asset: 'AAPL' },
+  { text: "Китай запретил майнинг. Биткоин в красной зоне.", impact: -0.08, asset: 'BTC' },
+  { text: "Правительство США одобрило спотовые ETF на BTC.", impact: 0.2, asset: 'BTC' }
+];
+
+function saveGame() {
+  const gameState = {
+    balance: balance,
+    assets: assets,
+    portfolio: portfolio,
+    tradeHistory: tradeHistory,
+    tickCount: tickCount
+  };
+  localStorage.setItem('trader_save', JSON.stringify(gameState));
+}
+
+function loadGame() {
+  const saved = localStorage.getItem('trader_save');
+  if (saved) {
+    try {
+      const gameState = JSON.parse(saved);
+      balance = gameState.balance;
+      assets = gameState.assets;
+      portfolio = gameState.portfolio;
+      tradeHistory = gameState.tradeHistory;
+      tickCount = gameState.tickCount || 0;
+      
+      updateUI();
+      
+      if (tradeHistory.length > 0) {
+        const list = document.getElementById('historyList');
+        list.innerHTML = tradeHistory.map(t => `
+          <div class="history-item">
+            <span class="${t.type === 'BUY' ? 'hist-buy' : 'hist-sell'}">
+              ${t.type === 'BUY' ? '▲ КУП' : '▼ ПРОД'} <span class="hist-asset">${t.asset}</span>
+            </span>
+            <span class="hist-amount">${t.amount} @ $${t.price.toFixed(2)}</span>
+          </div>
+        `).join('');
+      }
+    } catch (e) {
+      console.error("Ошибка загрузки сохранения", e);
+    }
+  }
+}
+
+function resetProgress() {
+  if(confirm("Вы уверены, что хотите сбросить весь прогресс? Это действие нельзя отменить.")) {
+    localStorage.removeItem('trader_save');
+    localStorage.removeItem('max_trader_balance');
+    location.reload();
+  }
+}
+
+// ==========================================
+// ЛОГИКА РЫНКА
+// ==========================================
+function generateNextCandle(asset) {
+  let currentPrice = asset.price;
+  let lastCandle = asset.history.length > 0 ? asset.history[asset.history.length - 1] : null;
+  let trend = lastCandle ? (lastCandle.close - lastCandle.open) / lastCandle.open : 0;
+  let currentVol = asset.vol + (tickCount * 0.00002); 
+  let change = (Math.random() - 0.5) * 2 * currentVol + (trend * 0.4);
+  
+  if (currentPrice * (1 + change) < 1) change = 0.01;
+
+  let open = currentPrice;
+  let close = open * (1 + change);
+  let high = Math.max(open, close) * (1 + Math.random() * 0.004);
+  let low = Math.min(open, close) * (1 - Math.random() * 0.004);
+  
+  let newCandle = { open, high, low, close };
+  asset.history.push(newCandle);
+  
+  if (asset.history.length > CANDLE_COUNT) asset.history.shift();
+  asset.price = close;
+}
+
+function triggerNews() {
+  const news = NEWS_EVENTS[Math.floor(Math.random() * NEWS_EVENTS.length)];
+  document.getElementById('newsText').textContent = "📰 " + news.text;
+  
+  let ticker = document.querySelector('.news-ticker span');
+  ticker.style.animation = 'none';
+  ticker.offsetHeight; 
+  ticker.style.animation = 'ticker 35s linear infinite';
+  
+  let affectedAsset = news.asset === 'all' ? null : news.asset;
+  for (let key in assets) {
+    if (!affectedAsset || key === affectedAsset) {
+      assets[key].price *= (1 + news.impact);
+      let last = assets[key].history[assets[key].history.length - 1];
+      if(last) {
+        last.close = assets[key].price;
+        last.high = Math.max(last.high, last.close);
+        last.low = Math.min(last.low, last.close);
+      }
+    }
+  }
+}
+
+// ==========================================
+// ГРАФИК
+// ==========================================
+const canvas = document.getElementById('chartCanvas');
+const ctx = canvas.getContext('2d');
+
+function drawChart() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  
+  const width = rect.width;
+  const height = rect.height;
+
+  const asset = assets[currentAsset];
+  const history = asset.history;
+
+  if (history.length === 0) return;
+
+  let min = Infinity, max = -Infinity;
+  history.forEach(c => {
+    if (c.low < min) min = c.low;
+    if (c.high > max) max = c.high;
+  });
+  
+  let diff = max - min;
+  min -= diff * 0.1;
+  max += diff * 0.1;
+
+  const paddingLeft = 60; 
+  const paddingRight = 20;
+  const paddingTop = 40;
+  const paddingBottom = 20;
+  
+  const graphWidth = width - paddingLeft - paddingRight;
+  const graphHeight = height - paddingTop - paddingBottom;
+  
+  const candleSpacing = graphWidth / CANDLE_COUNT;
+  const bodyWidth = candleSpacing * 0.7;
+
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#666';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'right';
+  
+  for (let i = 0; i <= 5; i++) {
+    let y = paddingTop + (graphHeight / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(paddingLeft, y);
+    ctx.lineTo(width - paddingRight, y);
+    ctx.stroke();
+    let price = max - ((max - min) / 5) * i;
+    ctx.fillText(price.toFixed(2), paddingLeft - 10, y + 4);
+  }
+
+  history.forEach((candle, i) => {
+    const x = paddingLeft + (i * candleSpacing) + (candleSpacing - bodyWidth) / 2;
+    const yOpen = paddingTop + graphHeight - ((candle.open - min) / (max - min)) * graphHeight;
+    const yClose = paddingTop + graphHeight - ((candle.close - min) / (max - min)) * graphHeight;
+    const yHigh = paddingTop + graphHeight - ((candle.high - min) / (max - min)) * graphHeight;
+    const yLow = paddingTop + graphHeight - ((candle.low - min) / (max - min)) * graphHeight;
+
+    const isGreen = candle.close >= candle.open;
+    ctx.fillStyle = isGreen ? '#00e676' : '#ff3d00';
+    ctx.strokeStyle = isGreen ? '#00e676' : '#ff3d00';
+
+    ctx.beginPath();
+    ctx.moveTo(x + bodyWidth / 2, yHigh);
+    ctx.lineTo(x + bodyWidth / 2, yLow);
+    ctx.stroke();
+
+    let bodyTop = Math.min(yOpen, yClose);
+    let bodyHeight = Math.max(Math.abs(yClose - yOpen), 1.5);
+    ctx.fillRect(x, bodyTop, bodyWidth, bodyHeight);
+  });
+  
+  ctx.fillStyle = '#ff7b00';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('$' + asset.price.toFixed(2), paddingLeft, 30);
+}
+
+// ==========================================
+// УПРАВЛЕНИЕ
+// ==========================================
+function startGame() {
+  playClick();
+  document.getElementById('menu').classList.remove('active');
+  document.getElementById('game').classList.add('active');
+  document.getElementById('achievements').classList.remove('active');
+  
+  for(let key in assets) {
+    if(assets[key].history.length === 0) {
+      for(let i=0; i<CANDLE_COUNT; i++) generateNextCandle(assets[key]);
+    }
+  }
+  
+  updateUI();
+  drawChart();
+  
+  if(chartInterval) clearInterval(chartInterval);
+  chartInterval = setInterval(() => {
+    tickCount++;
+    for(let key in assets) generateNextCandle(assets[key]);
+    drawChart();
+    updateUI();
+    saveGame();
+  }, TICK_INTERVAL);
+
+  if(newsInterval) clearInterval(newsInterval);
+  newsInterval = setInterval(triggerNews, 120000); 
+}
+
+function goToMenu() {
+  playClick();
+  if(chartInterval) clearInterval(chartInterval);
+  if(newsInterval) clearInterval(newsInterval);
+  saveGame();
+  document.getElementById('game').classList.remove('active');
+  document.getElementById('achievements').classList.remove('active');
+  document.getElementById('menu').classList.add('active');
+}
+
+function selectAsset(assetKey, btnElement) {
+  playClick();
+  currentAsset = assetKey;
+  document.querySelectorAll('.asset-selector button').forEach(b => b.classList.remove('active'));
+  btnElement.classList.add('active');
+  drawChart();
+}
+
+function updateUI() {
+  document.getElementById('balanceDisplay').textContent = '$' + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  
+  const assetsList = document.getElementById('assetsList');
+  let hasAssets = false;
+  let html = '';
+  
+  for(let key in portfolio) {
+    if(portfolio[key] > 0) {
+      hasAssets = true;
+      let val = portfolio[key] * assets[key].price;
+      html += `
+        <div class="asset-item">
+          <span>${key}: ${portfolio[key].toFixed(4)}</span>
+          <span>~$${val.toFixed(2)}</span>
+        </div>
+      `;
+    }
+  }
+  
+  if(!hasAssets) {
+    assetsList.innerHTML = `<div style="color:var(--muted); font-size:12px; text-align:center; margin-top:10px;">У вас пока нет активов</div>`;
+  } else {
+    assetsList.innerHTML = html;
+  }
+}
+
+function trade(type) {
+  playClick();
+  const amountInput = document.getElementById('tradeAmount');
+  let amount = parseFloat(amountInput.value);
+  
+  if (isNaN(amount) || amount <= 0) {
+    alert("Введите корректное количество!");
+    return;
+  }
+  
+  const price = assets[currentAsset].price;
+  const totalCost = amount * price;
+  
+  if (type === 'buy') {
+    if (balance >= totalCost) {
+      balance -= totalCost;
+      portfolio[currentAsset] += amount;
+      addHistory('BUY', currentAsset, amount, price);
+      playCashSound();
+    } else {
+      alert("Недостаточно средств на балансе!");
+    }
+  } else if (type === 'sell') {
+    if (portfolio[currentAsset] >= amount) {
+      portfolio[currentAsset] -= amount;
+      balance += totalCost;
+      addHistory('SELL', currentAsset, amount, price);
+      playCashSound();
+    } else {
+      alert("У вас нет столько " + currentAsset + "!");
+    }
+  }
+  
+  updateUI();
+  checkAchievements();
+  saveGame();
+  amountInput.value = '';
+}
+
+function getFreeMoney() {
+  playClick();
+  balance += 5000;
+  updateUI();
+  playCashSound();
+  checkAchievements();
+  saveGame();
+}
+
+function addHistory(type, asset, amount, price) {
+  tradeHistory.unshift({ type, asset, amount, price });
+  if (tradeHistory.length > 5) tradeHistory.pop();
+  
+  const list = document.getElementById('historyList');
+  list.innerHTML = tradeHistory.map(t => `
+    <div class="history-item">
+      <span class="${t.type === 'BUY' ? 'hist-buy' : 'hist-sell'}">
+        ${t.type === 'BUY' ? '▲ КУП' : '▼ ПРОД'} <span class="hist-asset">${t.asset}</span>
+      </span>
+      <span class="hist-amount">${t.amount} @ $${t.price.toFixed(2)}</span>
+    </div>
+  `).join('');
+}
+
+function checkAchievements() {
+  let maxBal = parseFloat(localStorage.getItem('max_trader_balance') || "0");
+  if (balance > maxBal) {
+    localStorage.setItem('max_trader_balance', balance);
+  }
+}
+
+function showAchievements() {
+  playClick();
+  document.getElementById('menu').classList.remove('active');
+  document.getElementById('achievements').classList.add('active');
+  
+  let maxBal = parseFloat(localStorage.getItem('max_trader_balance') || balance);
+  
+  const list = document.getElementById('achList');
+  list.innerHTML = ACHIEVEMENTS.map(a => {
+    let unlocked = maxBal >= a.target;
+    return `
+      <div class="ach-item ${unlocked ? 'unlocked' : ''}">
+        <span class="ach-title">${a.title}</span>
+        <span class="ach-reward">${unlocked ? '✅' : '🔒'} $${a.target.toLocaleString()}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+window.addEventListener('resize', () => {
+  if(document.getElementById('game').classList.contains('active')) drawChart();
+});
+
+window.addEventListener('load', () => {
+  loadGame();
+});
+</script>
+</body>
+</html>
